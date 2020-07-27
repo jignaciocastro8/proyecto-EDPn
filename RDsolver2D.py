@@ -3,6 +3,7 @@ import scipy as sp
 import matplotlib.pyplot as plt 
 from scipy import sparse
 from scipy.sparse import linalg
+from matplotlib import animation
 import time
 
 
@@ -21,8 +22,10 @@ class RDsolver2D:
         a: Constante del problema.
         gamma: Constante del problema.
         """
+        # Cond iniciales.
         self.u0 = u0
         self.v0 = v0
+        # Parámetros.
         self.Nt = Nt
         self.N = len(u0)
         self.d = d
@@ -32,6 +35,7 @@ class RDsolver2D:
         # Soluciones.
         self.U = u0
         self.V = v0
+    
         
     
     def matriz(self):
@@ -58,64 +62,64 @@ class RDsolver2D:
         U = self.U
         V = self.V
         alpha = self.N ** 2 / self.Nt
-        c = self.d * alpha
         dt = 1 / self.Nt
-        gamma = self.gamma
+        d = self.d
         a = self.a
         b = self.b
+        gamma = self.gamma
         A =  self.matriz()
-        T = 50000   
+        # Cantidad máxima de iteraciones.
+        T = 30000   
         for _ in np.arange(1, T + 1):
             U = U + alpha * (np.dot(A, U) + np.dot(U, A)) + dt * gamma * (a - U + U**2 * V)
-            V = V + self.d * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * gamma * (b - U**2 * V)
+            V = V + d * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * gamma * (b - U**2 * V)
         self.U = U
         self.V = V
 
-    def getInit(self):
-        return self.u0, self.v0
-
-    
     def plot(self):
         """
-        Realiza un plot de la solución.
+        Realiza un plot
         """
-    
-        
         f, axs = plt.subplots(2,2)
-        axs[0, 0].matshow(self.u0, cmap='gray')
-        axs[0, 1].matshow(self.v0, cmap='gray')
-        axs[1, 0].matshow(self.U, cmap='gray')
-        axs[1, 1].matshow(self.V, cmap='gray')
-        #plt.show()
-        """sp =  f.add_subplot(1, 2, 1 )
-        plt.title('u')
-        for n in np.arange(0, self.Nt, 100):
-            plt.plot(u[n])
+        axs[0, 0].matshow(self.u0)
+        axs[0, 1].matshow(self.v0, cmap='rainbow')
+        axs[1, 0].matshow(self.U)
+        axs[1, 1].matshow(self.V, cmap='rainbow')
 
-        sp =  f.add_subplot(1, 2, 2 )
-        plt.title('v')
-        for n in np.arange(0, self.Nt, 100):
-            plt.plot(v[n])
-        """
 
 
 
 """TEST"""
 
+N = 50
 
-# Mesh
+A1 = np.zeros((N, N))
+A1[10:20, 10:20] = 1
+A1[30:40, 30:40] = 1
+B1 = 1 - A1
+
+g = lambda x,y : np.exp(-((x - 3)**2 + (y - 2)**2))
 dx = 0.1
-x = np.arange(dx, 1, dx)
-y = np.arange(dx, 1, dx)
+x = np.arange(dx, 5, dx)
+y = np.arange(dx, 5, dx)
 xx, yy = np.meshgrid(x, y, sparse=False, indexing='ij')
 
+u0 = g(xx, yy)
+ #np.zeros((N, N))
+#u0[20:30, 20:30] = 1
+v0 = 1 - u0
 
-# Función indicatríz de un sub-cuadradito en el cuadradro [0, 1]x[0, 1]
-def f0(x, y):
-    return (0.4 <= x <= 0.6) and (0.4 <= y <= 0.6) 
+solver = RDsolver2D(400000, A1, B1, 10, 0.1, 0.9, 1000)
+solver2 = RDsolver2D(400000, u0, v0, 10, 0.1, 0.9, 1000)
 
-# Gaussiana
-g0 = lambda x,y : np.exp(-((x - 0.5)**2 + (y - 0.5)**2))
-    
+ti = time.time()
+solver.solve()
+solver2.solve()
+tf = time.time()
+print('Tiempo (seg): ', tf - ti)
+solver.plot()
+solver2.plot()
+plt.show() 
+
 
 

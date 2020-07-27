@@ -1,5 +1,8 @@
-from RDsolver2D import *
+#from RDsolver2D import *
 import time
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import animation
 # Mesh
 dx = 0.1
 x = np.arange(dx, 5, dx)
@@ -16,47 +19,21 @@ g0 = lambda x,y : np.exp(-((x - 0.5)**2 + (y - 0.5)**2))
     
 
 
-def get_initial_configuration(N, random_influence=0.01):
-    """
-    Initialize a concentration configuration. N is the side length
-    of the (N x N)-sized grid.
-    `random_influence` describes how much noise is added.
-    """
-    
-    # We start with a configuration where on every grid cell 
-    # there's a lot of chemical A, so the concentration is high
-    A = (1-random_influence) * np.ones((N,N)) + random_influence * np.random.random((N,N))
-    
-    # Let's assume there's only a bit of B everywhere
-    B = random_influence * np.random.random((N,N))
-    
-    # Now let's add a disturbance in the center
-    N2 = N//2
-    N4 = N//4
-    r = int(N/10)
-    
-    #A[N2-N4-r:N2-N4+r, N2-N4-r:N2-N4+r] = 0.50
-    A[N2-r:N2+r, N2-r:N2+r] = 0.50
-    B[N2-r:N2+r, N2-r:N2+r] = 0.25
-    
-    return A, B
-
 # Constructor : def __init__(self, Nt, u0, v0, d, a, b, gamma)
 
-N = 50
-A, B = get_initial_configuration(N, 0)
+"""N = 100
+
 A1 = np.zeros((N, N))
 A1[5:25, 5:25] = 1
 A1[30:40, 30:40] = 1
 B1 = 1 - A1
 
-# Funciones en t = 0.
+u0 = np.zeros((N, N))
+u0[20:30, 20:30] = 1
+v0 = 1 - u0
 
-u0 = np.random.random((N, N))
-v0 = np.random.random((N, N)) 
-a = 1
 solver = RDsolver2D(400000, A1, B1, 10, 0.1, 0.9, 1000)
-solver2 = RDsolver2D(400000, A, B, 10, 0.1, 0.9, 1000)
+solver2 = RDsolver2D(400000, u0, v0, 10, 0.1, 0.9, 1000)
 ti = time.time()
 solver.solve()
 solver2.solve()
@@ -64,4 +41,11 @@ tf = time.time()
 print(tf - ti)
 solver.plot()
 solver2.plot()
-plt.show()   
+plt.show() """  
+
+
+plt.matshow(np.random.random((50, 50)), cmap='nipy_spectral')
+plt.show()
+
+
+    
