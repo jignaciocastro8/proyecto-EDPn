@@ -35,6 +35,8 @@ class RDsolver2D:
         # Soluciones.
         self.U = u0
         self.V = v0
+        # Animación
+        self.M = []
     
         
     
@@ -69,12 +71,18 @@ class RDsolver2D:
         gamma = self.gamma
         A =  self.matriz()
         # Cantidad máxima de iteraciones.
-        T = 30000   
-        for _ in np.arange(1, T + 1):
+        # Revisar condiciones periódicas.
+        T = 100000  
+        for i in np.arange(1, T + 1):
             U = U + alpha * (np.dot(A, U) + np.dot(U, A)) + dt * gamma * (a - U + U**2 * V)
             V = V + d * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * gamma * (b - U**2 * V)
+            if i % 10 == 0:
+                self.M.append(U)
         self.U = U
         self.V = V
+
+    def getAnimation(self):
+        return self.M
 
     def plot(self):
         """
@@ -110,16 +118,33 @@ u0 = g(xx, yy)
 v0 = 1 - u0
 
 solver = RDsolver2D(400000, A1, B1, 10, 0.1, 0.9, 1000)
-solver2 = RDsolver2D(400000, u0, v0, 10, 0.1, 0.9, 1000)
+#solver2 = RDsolver2D(400000, u0, v0, 10, 0.1, 0.9, 1000)
 
-ti = time.time()
+#ti = time.time()
 solver.solve()
-solver2.solve()
-tf = time.time()
-print('Tiempo (seg): ', tf - ti)
-solver.plot()
-solver2.plot()
-plt.show() 
+#solver2.solve()
+#tf = time.time()
+#print('Tiempo (seg): ', tf - ti)
+#solver.plot()
+#solver2.plot()
+#plt.show() 
+
+
+"""Aminación"""
+
+M = solver.getAnimation()
+
+def update(i):
+    matrice.set_array(M[i])
+
+fig, ax = plt.subplots()
+matrice = ax.matshow(np.ones((50, 50)))
+plt.colorbar(matrice)
+
+ani = animation.FuncAnimation(fig, update, frames=80000, interval=20)
+ani.save('rd1.mp4')
+plt.show()
+
 
 
 
