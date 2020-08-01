@@ -8,12 +8,13 @@ import time
 
 
 """
-Esta clase se encarga de resolver la edp (4.1) en dos dimensiones.
-Se hace uso de un método explícito con actualización matricial. 
+Esta clase se encarga de resolver el modelo de Schnakenberg con diferencias finitas.
+Se hace uso de un método explícito DF con actualización matricial. 
+Asume que la grilla es de tamaño N x N dado por las matrices de condiciones iniciales. 
 """
 
-class RDsolver2D:
-    def __init__(self, Nt, u0, v0, d, a, b, gamma):
+class Schnakenberg:
+    def __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 100000):
         """
         Nt: Tamaño partición temporal. (Cantidad de iteraciones)
         u0: numpy array (N x N), solución u en t = 0.
@@ -21,6 +22,7 @@ class RDsolver2D:
         d: Constante del problema.
         a: Constante del problema.
         gamma: Constante del problema.
+        tMax: cantidad máxima de iteraciones.
         """
         # Cond iniciales.
         self.u0 = u0
@@ -32,11 +34,15 @@ class RDsolver2D:
         self.a = a
         self.b = b
         self.gamma = gamma
+        self.tMax = tMax
         # Soluciones.
         self.U = u0
         self.V = v0
-        # Animación
+        self.suma = np.zeros((self.N, self.N))
+        # Matriz para animación.
         self.M = []
+        # Promedio de la solución sobre la grilla.
+        self.mean = 0
     
         
     
@@ -45,13 +51,13 @@ class RDsolver2D:
         Crea y retorna la matrices asociadas a la discretización de derivadas.
         """
         offset = [-1, 0, 1]
-        # Matriz auxiliar
         up = np.ones(self.N - 1) 
         ppal = - 2 * np.ones(self.N) 
         down = up
         k = np.array([down, ppal, up])
         A = sparse.diags(k, offset)
         A = A.toarray()
+        # Condiciones de borde periódicas en ambos extremos.
         A[0][self.N - 1] = 1
         A[self.N - 1][0] = 1
         return A
@@ -59,7 +65,7 @@ class RDsolver2D:
 
     def solve(self):
         """
-        Calcula y guarda la solución como matriz de (Nt + 1) x (N + 1).  
+        Calcula y guarda la solución en tiempo final.  
         """
         U = self.U
         V = self.V
@@ -71,35 +77,73 @@ class RDsolver2D:
         gamma = self.gamma
         A =  self.matriz()
         # Cantidad máxima de iteraciones.
-        # Revisar condiciones periódicas.
-        T = 100000  
+        T = self.tMax 
+        ti = time.time()
         for i in np.arange(1, T + 1):
             U = U + alpha * (np.dot(A, U) + np.dot(U, A)) + dt * gamma * (a - U + U**2 * V)
             V = V + d * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * gamma * (b - U**2 * V)
-            if i % 10 == 0:
-                self.M.append(U)
+            #if i % 10 == 0:
+            #    self.M.append(U)
+        tf = time.time()
+        print('min: ', (tf - ti) / 60)
         self.U = U
         self.V = V
+        self.mean = [np.mean(U), np.mean(V)]
 
-    def getAnimation(self):
+    def getAnimationMatrix(self):
+        """
+        Retorna (cuando se calcula) arreglo con matrices con soluciones en varios tiempos.
+        """
         return self.M
+
+    def getMean(self):
+        """
+        Getter del promedio de las soluciones sobre la grilla.
+        """
+        return self.mean
+
+    def getSol(self):
+        """
+        Retorna la solución en el último tiempo calculado.
+        """
+        return self.U, self.V
+    
+    def setTmax(self, tMax):
+        """
+        Setter de tMax.
+        """
+        self.tMax = tMax
+
+    def setNt(self, Nt):
+        """
+        Setter de Nt.
+        """
+        self.Nt = Nt
+    
 
     def plot(self):
         """
         Realiza un plot
         """
-        f, axs = plt.subplots(2,2)
-        axs[0, 0].matshow(self.u0)
-        axs[0, 1].matshow(self.v0, cmap='rainbow')
-        axs[1, 0].matshow(self.U)
-        axs[1, 1].matshow(self.V, cmap='rainbow')
+        f, axs = plt.subplots(1,2)
+
+        axs[0].matshow(self.U, cmap='Blues')
+        axs[0].set_title(r'$u$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
+
+        axs[1].matshow(self.V, cmap='Blues')
+        axs[1].set_title(r'$v$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
+
+
+
 
 
 
 
 """TEST"""
 
-N = 50
+# Constructor --> __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 10000)
+
+"""N = 80
 
 A1 = np.zeros((N, N))
 A1[10:20, 10:20] = 1
@@ -112,27 +156,28 @@ x = np.arange(dx, 5, dx)
 y = np.arange(dx, 5, dx)
 xx, yy = np.meshgrid(x, y, sparse=False, indexing='ij')
 
-u0 = g(xx, yy)
- #np.zeros((N, N))
+#u0 = g(xx, yy)
+#np.zeros((N, N))
 #u0[20:30, 20:30] = 1
+u0 = np.random.random((N, N))
 v0 = 1 - u0
+# Figure 1 (dos bloques)
+#solver = Schnakenberg(300000, A1, B1, 10, 0.1, 0.9, 1000, 50000)
+# Figure 2 (random)
+solver2 = Schnakenberg(300000, u0, v0, 10, 0.1, 0.9, 4000, 300000)
 
-solver = RDsolver2D(400000, A1, B1, 10, 0.1, 0.9, 1000)
-#solver2 = RDsolver2D(400000, u0, v0, 10, 0.1, 0.9, 1000)
 
-#ti = time.time()
-solver.solve()
-#solver2.solve()
-#tf = time.time()
-#print('Tiempo (seg): ', tf - ti)
+#solver.solve()
+solver2.solve()
+
 #solver.plot()
-#solver2.plot()
-#plt.show() 
-
+solver2.plot()
+plt.show() 
+"""
 
 """Aminación"""
 
-M = solver.getAnimation()
+"""M = solver.getAnimation()
 
 def update(i):
     matrice.set_array(M[i])
@@ -142,8 +187,8 @@ matrice = ax.matshow(np.ones((50, 50)))
 plt.colorbar(matrice)
 
 ani = animation.FuncAnimation(fig, update, frames=80000, interval=20)
-ani.save('rd1.mp4')
-plt.show()
+#ani.save('rd1.mp4')
+plt.show()"""
 
 
 

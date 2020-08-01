@@ -5,7 +5,7 @@ from scipy import sparse
 from scipy.sparse import linalg
 import time
 
-class RDsolver:
+class RDsolver1D:
     def __init__(self, L, Nt, N, u0, v0, d, a):
         """
         L: Largo intervalo espacial.
@@ -100,7 +100,7 @@ a_1 = 1 / 2400
 a_2 = 1 / 120
 d = 1
 a = lambda u,v : 1 / ( (1 + u / a_1) * (1 + v / a_2) )
-solver = RDsolver(L, Nt, N, u0, v0, d, a)
+solver = RDsolver1D(L, Nt, N, u0, v0, d, a)
 solver.solve()
 solver.plot()
 
