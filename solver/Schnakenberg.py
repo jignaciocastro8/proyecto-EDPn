@@ -1,9 +1,10 @@
 import numpy as np 
 import scipy as sp 
 import matplotlib.pyplot as plt 
+plt.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\jigna\\ffmpeg\\bin\\ffmpeg.exe'
 from scipy import sparse
 from scipy.sparse import linalg
-from matplotlib import animation
+import matplotlib.animation as animation
 import time
 
 
@@ -14,9 +15,11 @@ Asume que la grilla es de tamaño N x N dado por las matrices de condiciones ini
 """
 
 class Schnakenberg:
-    def __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 100000):
+    def __init__(self, Nt, dx, dt, u0, v0, d, a, b, gamma, tMax = 100000):
         """
         Nt: Tamaño partición temporal. (Cantidad de iteraciones)
+        dx: paso espacial (ambas direcciones).
+        dt: paso temporal.
         u0: numpy array (N x N), solución u en t = 0.
         v0: numpy array (N x N), solución v en t = 0.
         d: Constante del problema.
@@ -24,12 +27,15 @@ class Schnakenberg:
         gamma: Constante del problema.
         tMax: cantidad máxima de iteraciones.
         """
+        # Parámetros.
+        self.Nt = Nt
+        self.dx = dx
+        self.dt = dt
+        self.N = len(u0)
         # Cond iniciales.
         self.u0 = u0
         self.v0 = v0
-        # Parámetros.
-        self.Nt = Nt
-        self.N = len(u0)
+        # Constantes del modelo.
         self.d = d
         self.a = a
         self.b = b
@@ -46,9 +52,12 @@ class Schnakenberg:
     
         
     
-    def matriz(self):
+    def matriz(self, flag=True):
         """
-        Crea y retorna la matrices asociadas a la discretización de derivadas.
+        Crea y retorna la matriz asociadas a la discretización de derivadas.
+        Creará la matríz para discretizar las derivadas en y.
+        Usar de la forma A * U + U * A^T
+        flag: boolean, true para condiciones de borde periódicas y false para flujo nulo en el borde.
         """
         offset = [-1, 0, 1]
         up = np.ones(self.N - 1) 
@@ -58,68 +67,60 @@ class Schnakenberg:
         A = sparse.diags(k, offset)
         A = A.toarray()
         # Condiciones de borde periódicas en ambos extremos.
-        A[0][self.N - 1] = 1
-        A[self.N - 1][0] = 1
+        if flag:
+            A[0][self.N - 2] = 1
+            A[self.N - 1][1] = 1
+        # Flujo nulo.
+        else:
+            A[0][1] = 2
+            A[self.N - 1][self.N - 2] = 2
         return A
 
 
-    def solve(self):
+    def solve(self, flag=True):
         """
-        Calcula y guarda la solución en tiempo final.  
+        Calcula y guarda la solución en tiempo final.
+        flag: boolean, true para condiciones de borde periódicas y false para flujo nulo en el borde.
         """
         U = self.U
         V = self.V
-        alpha = self.N ** 2 / self.Nt
+        alpha = self.dt / (self.dx**2)
         dt = 1 / self.Nt
         d = self.d
         a = self.a
         b = self.b
         gamma = self.gamma
-        A =  self.matriz()
+        A =  self.matriz(flag)
+        At = np.transpose(A)
         # Cantidad máxima de iteraciones.
         T = self.tMax 
         ti = time.time()
         for i in np.arange(1, T + 1):
-            U = U + alpha * (np.dot(A, U) + np.dot(U, A)) + dt * gamma * (a - U + U**2 * V)
-            V = V + d * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * gamma * (b - U**2 * V)
-            #if i % 10 == 0:
-            #    self.M.append(U)
+            U = U + alpha * (np.dot(A, U) + np.dot(U, At)) + self.dt * gamma * (a - U + U**2 * V)
+            V = V + d * alpha * (np.dot(A, V) + np.dot(V, At)) + self.dt * gamma * (b - U**2 * V)
+            if i % 1000 == 0:
+                print('iter n°: ', i)
+                self.M.append(U)
         tf = time.time()
         print('min: ', (tf - ti) / 60)
         self.U = U
         self.V = V
-        self.mean = [np.mean(U), np.mean(V)]
 
-    def getAnimationMatrix(self):
-        """
-        Retorna (cuando se calcula) arreglo con matrices con soluciones en varios tiempos.
-        """
-        return self.M
+    def animate(self, save=False):
+        fig = plt.figure()
 
-    def getMean(self):
-        """
-        Getter del promedio de las soluciones sobre la grilla.
-        """
-        return self.mean
+        ims = []
+        for matriz in self.M:
+            img = plt.imshow(matriz, animated=True)
+            ims.append([img])
 
-    def getSol(self):
-        """
-        Retorna la solución en el último tiempo calculado.
-        """
-        return self.U, self.V
-    
-    def setTmax(self, tMax):
-        """
-        Setter de tMax.
-        """
-        self.tMax = tMax
+        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
+        if save:
+            f = r"c://Users/jigna/Desktop/schnakenberg-"+ str(self.gamma) +".mp4" 
+            writervideo = animation.FFMpegWriter(fps=10) 
+            ani.save(f, writer=writervideo)
+        plt.show()
 
-    def setNt(self, Nt):
-        """
-        Setter de Nt.
-        """
-        self.Nt = Nt
-    
 
     def plot(self):
         """
@@ -127,10 +128,10 @@ class Schnakenberg:
         """
         f, axs = plt.subplots(1,2)
 
-        axs[0].matshow(self.U, cmap='Blues')
+        axs[0].matshow(self.U)
         axs[0].set_title(r'$u$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
 
-        axs[1].matshow(self.V, cmap='Blues')
+        axs[1].matshow(self.V)
         axs[1].set_title(r'$v$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
 
 
@@ -141,55 +142,31 @@ class Schnakenberg:
 
 """TEST"""
 
-# Constructor --> __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 10000)
+# Constructor -> def __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 100000)
 
-"""N = 80
+N = 80
 
-A1 = np.zeros((N, N))
-A1[10:20, 10:20] = 1
-A1[30:40, 30:40] = 1
-B1 = 1 - A1
+u0 = np.random.random((N, N)) * 10 ** -5
+v0 = np.random.random((N, N)) * 10 ** -5
 
-g = lambda x,y : np.exp(-((x - 3)**2 + (y - 2)**2))
-dx = 0.1
-x = np.arange(dx, 5, dx)
-y = np.arange(dx, 5, dx)
-xx, yy = np.meshgrid(x, y, sparse=False, indexing='ij')
+u0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.5
 
-#u0 = g(xx, yy)
-#np.zeros((N, N))
-#u0[20:30, 20:30] = 1
-u0 = np.random.random((N, N))
-v0 = 1 - u0
-# Figure 1 (dos bloques)
-#solver = Schnakenberg(300000, A1, B1, 10, 0.1, 0.9, 1000, 50000)
-# Figure 2 (random)
-solver2 = Schnakenberg(300000, u0, v0, 10, 0.1, 0.9, 4000, 300000)
+v0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.7
 
+#f, ax = plt.subplots(1,2)
+#ax[0].matshow(u0)
+#ax[0].set_title(r'$u(t=0)$', y = 1, fontname='serif')
+#ax[1].matshow(v0)
+#ax[1].set_title(r'$v(t=0)$', y = 1, fontname='serif')
+#plt.show()
 
-#solver.solve()
-solver2.solve()
+# Condición inicial determinista.
 
-#solver.plot()
-solver2.plot()
-plt.show() 
-"""
-
-"""Aminación"""
-
-"""M = solver.getAnimation()
-
-def update(i):
-    matrice.set_array(M[i])
-
-fig, ax = plt.subplots()
-matrice = ax.matshow(np.ones((50, 50)))
-plt.colorbar(matrice)
-
-ani = animation.FuncAnimation(fig, update, frames=80000, interval=20)
-#ani.save('rd1.mp4')
-plt.show()"""
-
+Nt = 3 * 10 ** 5
+solver = Schnakenberg(Nt=Nt, dt=1 / Nt, dx=1 / N, u0=u0, v0=v0, d=10, a=0.1, b=0.9, gamma=3000, tMax=Nt)
+solver.solve(True)
+solver.animate()
+#plt.show()
 
 
 

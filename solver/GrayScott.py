@@ -1,117 +1,182 @@
 import numpy as np 
 import scipy as sp 
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+plt.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\jigna\\ffmpeg\\bin\\ffmpeg.exe'
 from scipy import sparse
 from scipy.sparse import linalg
-from matplotlib import animation
+import matplotlib.animation as animation
 import time
 
 
 """
 Esta clase se encarga de resolver el modelo de Gray-Scott.
-
-HACER UN ESQUEMA IMPLICITO PARA ESTE MODELO.
+Hace uso de un método explícito, es inestable para variaciones de dt y dx.
 
 
 """
-
 class GrayScott:
-    def __init__(self, dx, Nt, dt, tMax, u0, v0, du, dv, F, k):
+    def __init__(self, Nt, dx, dt, u0, v0, Du, Dv, F, k, tMax):
         """
         Nt: Tamaño partición temporal. (Cantidad de iteraciones)
-        dt: salto temporal.
+        dx: paso espacial (ambas direcciones).
+        dt: paso temporal.
         u0: numpy array (N x N), solución u en t = 0.
         v0: numpy array (N x N), solución v en t = 0.
-        du: Constante del problema.
-        dv: Constante del problema.
+        Du: coeficiente de difusión para u.
+        Dv: coeficiente de difusión para v.
         F: Constante del problema.
         k: Constante del problema.
+        tMax: Cantidad máxima de iteraciones
         """
-        # Cond iniciales.
-        self.u0 = u0
-        self.v0 = v0
         # Parámetros.
-        self.dx = dx
         self.Nt = Nt
+        self.dx = dx
         self.dt = dt
         self.tMax = tMax
-        self.N = len(u0)
-        self.du = du
-        self.dv = dv
+        self.Du = Du
+        self.Dv = Dv
         self.F = F
         self.k = k
         # Soluciones.
         self.U = u0
         self.V = v0
-        # Animación
+        # Animación (solo de u)
         self.M = []
     
         
+
+    def matrizLap(self, A):
+        """
+        Crea y retorna matriz para discretizar laplaceano.
+        """
+        n = len(A)
+
+        # Nodo central.
+        A0 = -4 * A
+
+        # A1 nodo de la derecha. (columnas a la izq.)
+        A1 = np.roll(A, (0,-1), (0,1))
+        for i in range(n):
+            A1[i, n - 1] = A[i, 1]
+        
+        # A2 nodo de la izquierda. (Columnas a la der.)
+        A2 = np.roll(A, (0,+1), (0,1)) 
+        for i in range(n):
+            A2[i, 0] = A[i, n - 2]
+
+        # A3 nodo de abajo (Filas para arriba)
+        A3 = np.roll(A, (-1,0), (0,1)) 
+        for j in range(n):
+            A3[n - 1, j] = A[1, j]
+
+        # A4 nodo de arriba (Filas para abajo)
+        A4 = np.roll(A, (+1,0), (0,1))
+        for j in range(n):
+            A4[0, j] = A[n - 2, j]
+
+
+        return A0 + A1 + A2 + A3 + A4
+    def update(self, U, V):
+        """
+        Realiza un update a las matrices según la edp.
+        SI SE CAMBIA A ALGO DE LA FORMA: U+= ... return U, NO FUNCIONA.
+        """
+        alpha = self.dt / (self.dx ** 2)
+        U0 = U + alpha * self.Du * self.matrizLap(U) + (self.F * (1-U) - U * V**2) * self.dt
+        V0 = V + alpha * self.Dv * self.matrizLap(V) + (U * V**2 - (self.k + self.F)*V) * self.dt
     
-    def matriz(self):
-        """
-        Crea y retorna la matrices asociadas a la discretización de derivadas.
-        """
-        offset = [-1, 0, 1]
-        # Matriz auxiliar
-        up = np.ones(self.N - 1) 
-        ppal = - 2 * np.ones(self.N) 
-        down = up
-        k = np.array([down, ppal, up])
-        A = sparse.diags(k, offset)
-        A = A.toarray()
-        A[0][self.N - 1] = 1
-        A[self.N - 1][0] = 1
-        return A
+        return U0, V0
 
 
     def solve(self):
         """
-        Calcula y guarda la solución en tiempo final.  
+        Resuelve iterativamente.
         """
-        U = self.u0
-        V = self.v0
-        dt = self.dt
-        dx = self.dx
-        alpha = dt / dx**2
-        du = self.du
-        dv = self.dv
-        F = self.F
-        k = self.k
-        # Matriz
-        A =  self.matriz()
-        # Cantidad máxima de iteraciones.
-        T = self.tMax  
-        for i in np.arange(1, T + 1):
-            U = U + du * alpha * (np.dot(A, U) + np.dot(U, A)) + dt * (F * (1 - U) - U * V**2)
-            V = V + dv * alpha * (np.dot(A, V) + np.dot(V, A)) + dt * (U * V ** 2 - (F + k) * V)
-            #if i % 10 == 0:
-            #    self.M.append(U)
+        U = self.U 
+        V = self.V
+        A = []
+        ti = time.time()
+        for i in range(self.tMax):
+            if i % 100 == 0:
+                print('iter n°: ', i)
+                A.append(U)
+            U, V = self.update(U, V)
+            
+        tf = time.time()
+        print('tiempo (min):', (tf - ti) / 60)
+        self.M = A
         self.U = U
         self.V = V
-    def getAnimation(self):
-        return self.M
+        #return A
+
+    def animate(self, save=False):
+        """
+        Retorna un arreglo con soluciones de u en el tiempo.
+        """
+        fig = plt.figure()
+
+        ims = []
+        for matriz in self.M:
+            img = plt.imshow(matriz, animated=True)
+            ims.append([img])   
+
+        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
+        if save:
+            f = r"c://Users/jigna/Desktop/grayScott.mp4" 
+            writervideo = animation.FFMpegWriter(fps=10) 
+            ani.save(f, writer=writervideo)
+        plt.show()
+    
 
     def plot(self):
         """
         Realiza un plot
         """
-        f, axs = plt.subplots(2,2)
-        axs[0, 0].matshow(self.u0)
-        axs[0, 1].matshow(self.v0)
-        axs[1, 0].matshow(self.U)
-        axs[1, 1].matshow(self.V)
-        plt.show()
-        #axs[2, 0].matshow(self.suma)
-        #axs[2, 1].matshow(self.suma)
+
+        f, axs = plt.subplots(1,2)
+
+        axs[0].matshow(self.U)
+        axs[0].set_title(r'$u$', y = 1, fontname='serif')
+
+        axs[1].matshow(self.V)
+        axs[1].set_title(r'$v$', y = 1, fontname='serif')
+
+
+
+
+
 
 
 """Test"""
-N = 100
-u0 = np.ones((N, N))
-v0 = 1 - u0
-u0[40:60,40:60] = 1 / 2 
-v0[40:60,40:60] = 1 / 4 
-solver = GrayScott(0.2, 200000, 1, 100000, u0, v0, 2 * 10 **-5, 10**-5, 0.05, 0.063)
+
+# Constructor -> def __init__(self, Nt, dx, dt, u0, v0, Du, Dv, F, k, tMax = Nt)
+N = 200
+N2 = N//2
+radius = r = int(N/10.0)
+u0 = 0.8 * np.ones((N,N)) + 0.2 * np.random.random((N,N))
+v0 = 0.2 * np.random.random((N,N))
+u0[N2-r:N2+r, N2-r:N2+r] = 0.50
+v0[N2-r:N2+r, N2-r:N2+r] = 0.25
+Nt = 4 * 10 ** 3
+solver = GrayScott(Nt=Nt, dx=1, dt=1, u0=u0, v0=v0, Du=0.16, Dv=0.08, F=0.06, k=0.062, tMax=10000)
+
+
 solver.solve()
-solver.plot()
+solver.animate()
+"""fig = plt.figure()
+
+ims = []
+for matriz in M:
+    img = plt.imshow(matriz, animated=True)
+    ims.append([img])
+
+
+ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
+
+f = r"c://Users/jigna/Desktop/grayScott.mp4" 
+writervideo = animation.FFMpegWriter(fps=10) 
+ani.save(f, writer=writervideo)
+
+plt.show()"""
+
+
