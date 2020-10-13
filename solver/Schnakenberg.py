@@ -1,18 +1,19 @@
 import numpy as np 
 import scipy as sp 
 import matplotlib.pyplot as plt 
+# Para guardar los videos.
 plt.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\jigna\\ffmpeg\\bin\\ffmpeg.exe'
 from scipy import sparse
 from scipy.sparse import linalg
 import matplotlib.animation as animation
 import time
 
-
 """
 Esta clase se encarga de resolver el modelo de Schnakenberg con diferencias finitas.
 Se hace uso de un método explícito DF con actualización matricial. 
 Asume que la grilla es de tamaño N x N dado por las matrices de condiciones iniciales. 
 """
+np.random.seed(6)
 
 class Schnakenberg:
     def __init__(self, Nt, dx, dt, u0, v0, d, a, b, gamma, tMax = 100000):
@@ -50,7 +51,7 @@ class Schnakenberg:
         # Promedio de la solución sobre la grilla.
         self.mean = 0
     
-        
+    
     
     def matriz(self, flag=True):
         """
@@ -85,7 +86,6 @@ class Schnakenberg:
         U = self.U
         V = self.V
         alpha = self.dt / (self.dx**2)
-        dt = 1 / self.Nt
         d = self.d
         a = self.a
         b = self.b
@@ -99,7 +99,7 @@ class Schnakenberg:
             U = U + alpha * (np.dot(A, U) + np.dot(U, At)) + self.dt * gamma * (a - U + U**2 * V)
             V = V + d * alpha * (np.dot(A, V) + np.dot(V, At)) + self.dt * gamma * (b - U**2 * V)
             if i % 1000 == 0:
-                print('iter n°: ', i)
+                print('avance: ' + str(100 * i / Nt) + ' %')
                 self.M.append(U)
         tf = time.time()
         print('min: ', (tf - ti) / 60)
@@ -107,11 +107,17 @@ class Schnakenberg:
         self.V = V
 
     def animate(self, save=False):
+        """
+        Crea un video.
+        save: boolean, true para guardar expecificando la ruta más abajo.
+        """
         fig = plt.figure()
 
         ims = []
         for matriz in self.M:
             img = plt.imshow(matriz, animated=True)
+            plt.title(r'$u$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
+            plt.axis('off')
             ims.append([img])
 
         ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
@@ -134,39 +140,44 @@ class Schnakenberg:
         axs[1].matshow(self.V)
         axs[1].set_title(r'$v$ con $\gamma=$' + str(self.gamma), y = 1, fontname='serif')
 
+        plt.show()
 
 
 
 
 
 
-"""TEST"""
+"""Generar plots y videos"""
 
 # Constructor -> def __init__(self, Nt, u0, v0, d, a, b, gamma, tMax = 100000)
 
 N = 80
-
-u0 = np.random.random((N, N)) * 10 ** -5
-v0 = np.random.random((N, N)) * 10 ** -5
-
-u0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.5
-
-v0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.7
-
-#f, ax = plt.subplots(1,2)
-#ax[0].matshow(u0)
-#ax[0].set_title(r'$u(t=0)$', y = 1, fontname='serif')
-#ax[1].matshow(v0)
-#ax[1].set_title(r'$v(t=0)$', y = 1, fontname='serif')
-#plt.show()
-
-# Condición inicial determinista.
-
 Nt = 3 * 10 ** 5
-solver = Schnakenberg(Nt=Nt, dt=1 / Nt, dx=1 / N, u0=u0, v0=v0, d=10, a=0.1, b=0.9, gamma=3000, tMax=Nt)
-solver.solve(True)
-solver.animate()
-#plt.show()
+# Condición inicial aleatoria.
+
+def aleatoria():
+    u0 = np.random.random((N, N))
+    v0 = np.random.random((N, N))
+
+    aleatoria = Schnakenberg(Nt=Nt, dt=1/Nt, dx=1/N, u0=u0, v0=v0, d=10, a=0.1, b=0.9, gamma=7000, tMax=Nt)
+    aleatoria.solve()
+    aleatoria.animate()
+
+# aleatoria()
+
+# Condición inicial determinista
+def determinista():
+
+    u0 = np.zeros((N,N))
+    u0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.2
+    v0 = np.zeros((N,N))
+    v0[N//2-10:N//2+10, N//2-10:N//2+10] = 0.8
+
+    determinista = Schnakenberg(Nt=Nt, dt=1/Nt, dx=1/N, u0=u0, v0=v0, d=10, a=0.1, b=0.9, gamma=3000, tMax=Nt)
+    determinista.solve()
+    determinista.plot()
+
+determinista()
 
 
 

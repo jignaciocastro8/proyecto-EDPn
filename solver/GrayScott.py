@@ -11,9 +11,11 @@ import time
 """
 Esta clase se encarga de resolver el modelo de Gray-Scott.
 Hace uso de un método explícito, es inestable para variaciones de dt y dx.
-
-
+Se utiliza un método que a partir de una matriz U retorna la aplicación del laplaceano
+discretizado en cada componente (cond. de borde periódicas ambas direcciones).
 """
+np.random.seed(6)
+
 class GrayScott:
     def __init__(self, Nt, dx, dt, u0, v0, Du, Dv, F, k, tMax):
         """
@@ -97,8 +99,8 @@ class GrayScott:
         A = []
         ti = time.time()
         for i in range(self.tMax):
-            if i % 100 == 0:
-                print('iter n°: ', i)
+            if i % 10 == 0:
+                print('avance: ' + str(100 * i / self.Nt) + ' %')
                 A.append(U)
             U, V = self.update(U, V)
             
@@ -107,7 +109,6 @@ class GrayScott:
         self.M = A
         self.U = U
         self.V = V
-        #return A
 
     def animate(self, save=False):
         """
@@ -117,13 +118,14 @@ class GrayScott:
 
         ims = []
         for matriz in self.M:
-            img = plt.imshow(matriz, animated=True)
+            img = plt.imshow(matriz, cmap='coolwarm', animated=True)
+            plt.axis('off')
             ims.append([img])   
 
-        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
+        ani = animation.ArtistAnimation(fig, ims, blit=True)
         if save:
-            f = r"c://Users/jigna/Desktop/grayScott.mp4" 
-            writervideo = animation.FFMpegWriter(fps=10) 
+            f = r"c://Users/jigna/Desktop/grayScott"+ str(self.F) +"-"+ str(self.k) +".mp4" 
+            writervideo = animation.FFMpegWriter(fps=8) 
             ani.save(f, writer=writervideo)
         plt.show()
     
@@ -133,13 +135,17 @@ class GrayScott:
         Realiza un plot
         """
 
-        f, axs = plt.subplots(1,2)
+        f, axs = plt.subplots(1,1)
 
-        axs[0].matshow(self.U)
-        axs[0].set_title(r'$u$', y = 1, fontname='serif')
+        axs.matshow(self.U)
+        axs.set_title(r'F= '+str(self.F)+', k= '+str(self.k) , y = 1, fontname='serif')
+        axs.axis('off')
 
-        axs[1].matshow(self.V)
-        axs[1].set_title(r'$v$', y = 1, fontname='serif')
+        #axs[1].matshow(self.V)
+        #axs[1].set_title(r'$v$ '+'F= '+str(self.F)+', k= '+str(self.k) , y = 1, fontname='serif')
+        #axs[1].axis('off')
+
+        plt.show()
 
 
 
@@ -150,33 +156,49 @@ class GrayScott:
 """Test"""
 
 # Constructor -> def __init__(self, Nt, dx, dt, u0, v0, Du, Dv, F, k, tMax = Nt)
-N = 200
-N2 = N//2
-radius = r = int(N/10.0)
-u0 = 0.8 * np.ones((N,N)) + 0.2 * np.random.random((N,N))
-v0 = 0.2 * np.random.random((N,N))
-u0[N2-r:N2+r, N2-r:N2+r] = 0.50
-v0[N2-r:N2+r, N2-r:N2+r] = 0.25
-Nt = 4 * 10 ** 3
-solver = GrayScott(Nt=Nt, dx=1, dt=1, u0=u0, v0=v0, Du=0.16, Dv=0.08, F=0.06, k=0.062, tMax=10000)
 
+def ruido():
+    N = 200
+    N2 = N//2
+    r = int(N/10.0)
+    u0 = 0.8 * np.ones((N,N)) + 0.2 * np.random.random((N,N))
+    v0 = 0.2 * np.random.random((N,N))
+    u0[N2-r:N2+r, N2-r:N2+r] = 0.50
+    v0[N2-r:N2+r, N2-r:N2+r] = 0.25
+    Nt = 5 * 10 ** 3
+    solver = GrayScott(Nt=Nt, dx=1, dt=1, u0=u0, v0=v0, Du=0.16, Dv=0.08, F=0.043, k=0.062, tMax=Nt)
 
-solver.solve()
-solver.animate()
-"""fig = plt.figure()
+    solver.solve()
+    solver.animate(True)
+    solver.plot()
+    
 
-ims = []
-for matriz in M:
-    img = plt.imshow(matriz, animated=True)
-    ims.append([img])
+#ruido()
 
+def determinista():
+    r = 10
+    N = 200
+    Nt = 5 * 10 ** 3
 
-ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True)
+    u0 = 0.8 * np.ones((N,N)) + 0.2 * np.random.random((N,N))
+    v0 = 0.2 * np.random.random((N,N))
 
-f = r"c://Users/jigna/Desktop/grayScott.mp4" 
-writervideo = animation.FFMpegWriter(fps=10) 
-ani.save(f, writer=writervideo)
+    #u0[N//2-r:N//2+r, N//2-r:N//2+r] = 0.50
+        #v0[N//2-r:N//2+r, N//2-r:N//2+r] = 0.5
+    r = 10
+    for n in range(10):
+        i = np.random.randint(160) + 30
+        j = np.random.randint(160) + 30
+        u0[i-r:i+r, j-r:j+r] = 0.5
+        v0[i-r:i+r, j-r:j+r] = 0.5
 
-plt.show()"""
+    solver = GrayScott(Nt=Nt, dx=1, dt=1, u0=u0, v0=v0, Du=0.16, Dv=0.06, F=0.03, k=0.062, tMax=Nt)
+
+    solver.solve()
+    solver.plot()
+    #solver.animate(True)
+
+determinista()
+
 
 
