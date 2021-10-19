@@ -1,5 +1,5 @@
-# repoEDPn
-El proyecto muestra un estudio de ecuaciones de reacción difusión y como la
-variación en los parámetros de estas generan distintos patrones. En el archivo
-presentación se encuentra información más específica.
+# PDE lab
 
+This repository contains a study on reaction-diffusion equations. The equation parameters are managed to create distincts visual patterns.
+
+More info can be found on file "presentacion.pdf".
